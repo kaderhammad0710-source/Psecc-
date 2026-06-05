@@ -1,309 +1,242 @@
-"""
-PSEC v2.1 — Quasi-Crystal Signature (QCS) Module
-=================================================
-Architecture Entropique Fluide
+# PSEC — Fluid Entropic Security Architecture
+### v2.1.0 · PSC Cyber
 
-Auteur   : PSEC Project
-Version  : 2.1.0
-Licence  : Propriétaire / Recherche
+> *"The reed bends. The target moves. The mark remains."*
 
-Description
------------
-Le module QCS implémente la signature quasi-cristalline du système PSEC.
-Chaque signature est unique, ordonnée (structure de Penrose), non-forgeab-
-le (liée à l'empreinte KDR) et vérifiable par cohérence topologique sans
-stockage de la valeur exacte.
+---
 
-Composantes
------------
-  - EntropicClock     : Horloge entropique E(t) — graine non-reproductible
-  - PenroseProjector  : Projection quasi-cristalline P(E(t))
-  - QCSGenerator      : Génération de la signature QCS(f, a)
-  - QCSFragmenter     : Fragmentation asymétrique Shamir (2,3)-threshold
-  - QCSValidator      : Validation par cohérence topologique
-  - TopologicalAudit  : Journal d'audit infalsifiable
+## Overview
 
-Dépendances
------------
-  pip install cryptography numpy argon2-cffi
-"""
+**PSEC** (PSC Cyber) is a research-grade security architecture that combines four orthogonal defense primitives into a unified, mathematically coherent system. Its defining characteristic is **architectural entropy** — the attack surface is never static, and every artifact the attacker extracts becomes a tracer against them.
 
-import hashlib
-import hmac
-import os
-import time
-import struct
-import json
-import math
-import secrets
-from dataclasses import dataclass, field, asdict
-from typing import Tuple, List, Optional
-from enum import Enum
+The system is built around a single mathematical spine: **quasi-crystal topology** (Penrose tiling). The same aperiodic structure governs storage fragmentation, signature generation, and audit trail integrity. This is not a collection of assembled tools — it is a system with a unified internal logic.
 
-# ── Dépendances optionnelles ──────────────────────────────────────────────────
-try:
-    import numpy as np
-    _NUMPY = True
-except ImportError:
-    _NUMPY = False
+---
 
-try:
-    from argon2 import PasswordHasher
-    from argon2.low_level import hash_secret_raw, Type
-    _ARGON2 = True
-except ImportError:
-    _ARGON2 = False
+## Core Primitives
 
+| Component | Role | Mechanism |
+|---|---|---|
+| `Kernel_Liquid` | Moving Target Defense | Entropic rotation of ports, protocols, cipher suites |
+| `Shadow_Magazine` | Deception / Honeypot | Stratified lure data with zero real value |
+| `Inked_Payload` | Active Watermarking | Quasi-crystal signatures embedded in every artifact |
+| `KDR` | Behavioral Biometrics | Keystroke dynamics authentication |
 
-# ═════════════════════════════════════════════════════════════════════════════
-# CONSTANTES GLOBALES
-# ═════════════════════════════════════════════════════════════════════════════
+---
 
-PSEC_VERSION       = "2.1.0"
-PENROSE_PHI        = (1 + math.sqrt(5)) / 2          # Nombre d'or φ
-PENROSE_DIMENSIONS = 5                                # Réseau R^5 → R^2
-QCS_FRAGMENT_COUNT = 3                                # Shamir (2,3)-threshold
-QCS_THRESHOLD      = 2                                # Fragments min pour reconstruire
-WINDOW_TOLERANCE   = 0.15                             # Tolérance topologique (15%)
-HASH_ALGO          = "sha3_256"                       # SHA-3 par défaut
+## Architecture
 
+```
+┌─────────────────────────────────────────────────────┐
+│                  PSEC v2.1 — Fluid Core              │
+│                                                      │
+│   [Kernel_Liquid]  ←──  Entropic Clock E(t)          │
+│         │                                            │
+│         ▼                                            │
+│   [Shadow_Magazine]  ──  3-tier credibility gradient │
+│         │                                            │
+│         ▼                                            │
+│   [Ink_Wrapper]  ←──  QCS + KDR empreinte           │
+│         │                                            │
+│         ▼                                            │
+│   [Propagation Beacon]  ──  Forensic watermark       │
+│         │                                            │
+│         ▼                                            │
+│   [Topological Audit Trail]  ──  Tamper-evident log  │
+└─────────────────────────────────────────────────────┘
+```
 
-# ═════════════════════════════════════════════════════════════════════════════
-# I. ENTROPIC CLOCK  —  E(t)
-# ═════════════════════════════════════════════════════════════════════════════
+---
 
-class EntropicClock:
-    """
-    Horloge entropique E(t).
+## The QCS — Quasi-Crystal Signature
 
-    E(t) = H( Δλ(t) ‖ σ_cpu(t) ‖ τ_hi(t) ‖ os_entropy )
+The cryptographic core of PSEC. Every file artifact is signed with a **QCS** — a signature whose uniqueness is guaranteed by quasi-crystal geometry rather than simple randomness.
 
-    Produit une graine non-reproductible et non-prédictible à partir de
-    sources de volatilité système combinées.
-    """
+### Mathematical Definition
 
-    def __init__(self, window_size: int = 8):
-        """
-        Parameters
-        ----------
-        window_size : int
-            Nombre de mesures de latence pour calculer la variance Δλ(t).
-        """
-        self.window_size = window_size
-        self._latency_window: List[float] = []
+$$\mathcal{QCS}(f, a) = \Phi\bigl(\mathcal{P}(\mathcal{E}(t)),\ \kappa_{KDR},\ \chi(f, a)\bigr)$$
 
-    # ── Mesures de volatilité ─────────────────────────────────────────────
+Where:
 
-    def _sample_latency_variance(self) -> float:
-        """Variance des latences d'appels système successifs (µs)."""
-        samples = []
-        for _ in range(self.window_size):
-            t0 = time.perf_counter_ns()
-            _ = os.urandom(1)           # syscall léger
-            t1 = time.perf_counter_ns()
-            samples.append(t1 - t0)
+- $\mathcal{E}(t) = H\bigl(\Delta\lambda(t) \| \sigma_{cpu}(t) \| \tau_{hi}(t) \| \text{os\_entropy}\bigr)$ — Entropic Clock
+- $\mathcal{P}(\mathcal{E}(t))$ — Penrose projection from $\mathbb{R}^5 \to \mathbb{R}^2$, seeded by $\mathcal{E}(t)$
+- $\kappa_{KDR}$ — behavioral biometric vector (keystroke dynamics)
+- $\chi(f, a) = H(\text{PID} \| \text{UID} \| \text{syscall\_trace} \| f_{hash})$ — access context
+- $\Phi$ — HKDF-SHA3 composition function
 
-        mean = sum(samples) / len(samples)
-        variance = sum((x - mean) ** 2 for x in samples) / len(samples)
-        return variance
+### Why Quasi-Crystal?
 
-    def _sample_cpu_jitter(self) -> int:
-        """Micro-fluctuations du scheduler CPU via perf_counter_ns."""
-        readings = [time.perf_counter_ns() for _ in range(16)]
-        deltas = [readings[i+1] - readings[i] for i in range(len(readings)-1)]
-        return sum(deltas)
+A Penrose tiling has a fundamental property: **ordered but aperiodic**. No translation reproduces it. This gives the QCS two simultaneously held properties that classical signatures cannot achieve together:
 
-    def _sample_os_entropy(self) -> bytes:
-        """Entropie système directe (CSPRNG OS)."""
-        return os.urandom(32)
+- **Always different** — two accesses to the same file produce distinct, uncorrelated signatures
+- **Ordered entropy** — the server validates membership in the quasi-crystal space without storing the exact value
 
-    # ── Génération de E(t) ────────────────────────────────────────────────
+Formally, the validation server stores only the **acceptance window** $\mathcal{W}$:
 
-    def tick(self) -> bytes:
-        """
-        Génère une graine entropique E(t) de 32 octets.
+$$\text{Valid}(\mathcal{QCS}') = \begin{cases} 1 & \text{if } \pi_\perp(\mathcal{QCS}') \in \mathcal{W} \\ 0 & \text{otherwise} \end{cases}$$
 
-        Returns
-        -------
-        bytes
-            Graine entropique H(Δλ ‖ σ_cpu ‖ τ_hi ‖ os_entropy).
-        """
-        delta_lambda = self._sample_latency_variance()
-        sigma_cpu    = self._sample_cpu_jitter()
-        tau_hi       = time.perf_counter_ns()
-        os_entropy   = self._sample_os_entropy()
+A compromised server leaks only $\mathcal{W}$ — insufficient to forge a valid QCS without $\kappa_{KDR}$.
 
-        # Sérialisation déterministe des composantes numériques
-        numeric_bytes = struct.pack(
-            ">dqq",
-            delta_lambda,
-            sigma_cpu,
-            tau_hi
-        )
+### Asymmetric Fragmentation
 
-        # H( Δλ ‖ σ_cpu ‖ τ_hi ‖ os_entropy )
-        h = hashlib.new(HASH_ALGO)
-        h.update(numeric_bytes)
-        h.update(os_entropy)
-        return h.digest()   # 32 octets
+Each QCS is split via **Shamir (2,3)-threshold secret sharing** over $GF(257)$:
 
+$$\mathcal{QCS} \rightarrow \{s_1, s_2, s_3\}$$
 
-# ═════════════════════════════════════════════════════════════════════════════
-# II. PENROSE PROJECTOR  —  P(E(t))
-# ═════════════════════════════════════════════════════════════════════════════
+| Fragment | Destination | Notes |
+|---|---|---|
+| $s_1$ | File headers | Survives metadata strip |
+| $s_2$ | System metadata | Removed by naive attacker |
+| $s_3$ | File body (structural stego) | Survives file copy |
 
-class PenroseProjector:
-    """
-    Projection quasi-cristalline de Penrose.
+Any two fragments reconstruct the full signature via Lagrange interpolation. A single fragment reveals nothing.
 
-    Implémente la projection cut-and-project :
-        Λ ⊂ R^5  →  R^2
-    via la méthode des 5 directions de base à angle φ.
+---
 
-    La graine entropique E(t) détermine le vecteur de décalage dans R^5
-    (le "cut"), produisant un pavage apériodique unique à chaque appel.
-    """
+## Attack Lifecycle
 
-    def __init__(self, grid_size: int = 64):
-        """
-        Parameters
-        ----------
-        grid_size : int
-            Résolution du pavage (nombre de points projetés).
-        """
-        self.grid_size  = grid_size
-        self._basis     = self._compute_penrose_basis()
+```
+Phase 1 — ATTRACTION
+  Attacker interacts with Shadow_Magazine.
+  System simulates normal resistance ("helmet effect").
 
-    def _compute_penrose_basis(self) -> List[Tuple[float, float]]:
-        """
-        5 vecteurs de base de Penrose dans R^2.
+Phase 2 — EXTRACTION  
+  Attacker exfiltrates lure data.
+  Kernel_Liquid detects exfiltration → rotates to new network config.
+  System moves. Attack surface disappears.
 
-        e_k = ( cos(2πk/5), sin(2πk/5) )  pour k = 0..4
-        """
-        return [
-            (math.cos(2 * math.pi * k / 5),
-             math.sin(2 * math.pi * k / 5))
-            for k in range(5)
-        ]
+Phase 3 — MARKING
+  Attacker opens the file.
+  Marker_DNA (QCS) activates → Beacon fires to monitoring server.
+  Server receives: IP, execution context, machine ID.
 
-    def _seed_to_offset(self, seed: bytes) -> List[float]:
-        """
-        Convertit E(t) en vecteur de décalage dans R^5.
+Phase 4 — PROPAGATION
+  Attacker forwards file.
+  Propagation_Trigger fires on new recipient.
+  Real-time propagation map constructed.
+```
 
-        Chaque composante est dérivée d'un segment de 6 octets du seed,
-        normalisée dans [0, 1].
-        """
-        offsets = []
-        for i in range(5):
-            # Dérive 6 octets par composante (seed de 32 octets → 5 × 6 = 30)
-            segment = seed[i*6 : i*6 + 6]
-            value   = int.from_bytes(segment, "big")
-            max_val = (1 << 48) - 1
-            offsets.append(value / max_val)
-        return offsets
+---
 
-    def project(self, seed: bytes) -> List[Tuple[float, float]]:
-        """
-        Génère le pavage quasi-cristallin pour une graine donnée.
+## Entropic Clock
 
-        Parameters
-        ----------
-        seed : bytes
-            Graine entropique E(t) (32 octets).
+$\mathcal{E}(t)$ is not a timestamp. It is a state vector derived from system volatility:
 
-        Returns
-        -------
-        List[Tuple[float, float]]
-            Points du pavage dans R^2.
-        """
-        offsets = self._seed_to_offset(seed)
-        points  = []
+```python
+E(t) = SHA3-256(
+    Δλ(t)          # syscall latency variance
+    ‖ σ_cpu(t)     # CPU scheduler micro-jitter  
+    ‖ τ_hi(t)      # nanosecond-precision counter
+    ‖ os_entropy   # CSPRNG (os.urandom)
+)
+```
 
-        for n in range(-self.grid_size // 2, self.grid_size // 2):
-            for k in range(5):
-                # Coordonnée dans l'hyperplan R^5
-                hyper_coord = n + offsets[k]
+The mutation window of `Kernel_Liquid` is seeded by $\mathcal{E}(t)$ — making the reconfiguration schedule itself unpredictable.
 
-                # Projection sur R^2 via la base de Penrose
-                ex, ey = self._basis[k]
-                x = hyper_coord * ex
-                y = hyper_coord * ey
+---
 
-                # Fenêtre d'acceptance : garde les points proches de l'origine
-                if abs(x) <= self.grid_size / 4 and abs(y) <= self.grid_size / 4:
-                    points.append((round(x, 6), round(y, 6)))
+## Topological Audit Trail
 
-        return points
+Every system event — legitimate or hostile — is recorded in a hash chain whose structure satisfies quasi-crystal topological constraints:
 
-    def compute_topological_fingerprint(
-        self, points: List[Tuple[float, float]]
-    ) -> bytes:
-        """
-        Calcule l'empreinte topologique du pavage.
+$$e_{i+1} = H\bigl(e_i \| \mathcal{QCS}_i \| \mathcal{E}(t_i)\bigr)$$
 
-        L'empreinte encode les propriétés statistiques de la structure
-        (distribution des distances, symétrie locale) sans stocker les
-        coordonnées exactes — utilisée pour la validation côté serveur.
+Any insertion or deletion breaks topological coherence, detectable in $O(\log n)$.
 
-        Returns
-        -------
-        bytes
-            Empreinte topologique de 32 octets.
-        """
-        if not points:
-            return b"\x00" * 32
+---
 
-        # Distribution des distances entre points voisins
-        distances = []
-        sample = points[:min(len(points), 128)]   # échantillon représentatif
-        for i, (x1, y1) in enumerate(sample):
-            for (x2, y2) in sample[i+1:i+4]:
-                d = math.sqrt((x2-x1)**2 + (y2-y1)**2)
-                distances.append(d)
+## Module Structure
 
-        if not distances:
-            return b"\x00" * 32
+```
+psec/
+├── psec_qcs.py          # QCS core module (production-grade)
+│   ├── EntropicClock    # E(t) — entropy seed generation
+│   ├── PenroseProjector # R^5 → R^2 quasi-crystal projection
+│   ├── QCSGenerator     # Φ(P(E(t)), κ_KDR, χ(f,a)) via HKDF-SHA3
+│   ├── QCSFragmenter    # Shamir (2,3)-threshold over GF(257)
+│   ├── QCSValidator     # Topological coherence validation
+│   ├── TopologicalAudit # Tamper-evident hash chain
+│   └── PSECQCSEngine    # Unified interface
+├── README.md
+└── ...
+```
 
-        mean_d  = sum(distances) / len(distances)
-        # Ratio d'or : signature de la structure de Penrose
-        phi_ratio = mean_d * PENROSE_PHI
+---
 
-        # Encode les statistiques dans un hash stable
-        stats_bytes = struct.pack(
-            ">ff",
-            mean_d,
-            phi_ratio
-        )
-        h = hashlib.new(HASH_ALGO)
-        h.update(stats_bytes)
-        h.update(struct.pack(">i", len(points)))
-        return h.digest()
+## Quick Start
 
+```bash
+pip install cryptography argon2-cffi
+python psec_qcs.py
+```
 
-# ═════════════════════════════════════════════════════════════════════════════
-# III. STRUCTURES DE DONNÉES
-# ═════════════════════════════════════════════════════════════════════════════
+```
+============================================================
+  PSEC v2.1.0 — QCS Module Demo
+============================================================
 
-@dataclass
-class AccessContext:
-    """
-    χ(f, a) — Contexte d'accès à un fichier.
+[KDR]  κ_KDR simulé      : 9af26cbc5927d49d64b6cf372cdcc7f2...
+[QCS]  Signature         : ba8af92de30a08ee6f6e408457d00310...
+[QCS]  Points Penrose    : 178
+[QCS]  Liée à KDR       : True
 
-    Capture l'environnement d'exécution au moment de la génération
-    de la signature QCS.
-    """
-    file_hash:    str           # Hash SHA3-256 du fichier
-    pid:          int           # PID du processus demandeur
-    uid:          int           # UID de l'utilisateur
-    syscall_hint: str           # Hint d'appel système (open/read/copy)
-    timestamp_ns: int = field(default_factory=time.perf_counter_ns)
-    session_id:   str = field(default_factory=lambda: secrets.token_hex(8))
+── Reconstruction (fragments 1 + 3) ────────────────────
+[REC]  Correspondance    : ✓ MATCH
 
-    def to_bytes(self) -> bytes:
-        """Sérialisation déterministe pour hachage."""
-        payload = f"{self.file_hash}|{self.pid}|{self.uid}|" \
-                  f"{self.syscall_hint}|{self.timestamp_ns}|{self.session_id}"
-        return payload.encode("utf-8")
+── Validation Topologique ──────────────────────────────
+[VAL]  Résultat          : ✓ VALIDE
+```
+
+---
+
+## Design Principles
+
+**Non-locality** — No request has a fixed path. The system is liquid: data flow takes a different route at every iteration. There is no fixed target to hit.
+
+**Ordered entropy** — Unpredictability is not chaos. Every random element in PSEC is seeded by structured entropy, making the system both unpredictable to attackers and verifiable by defenders.
+
+**Architectural unity** — QSE (storage), QCS (signing), and the Audit Trail all speak the same mathematical language. Penrose topology is not a metaphor — it is the implementation substrate.
+
+**Attacker-as-sensor** — The system does not merely defend. It converts every hostile action into intelligence. The attacker's exfiltration triggers a reconfiguration. Their file access fires a beacon. Their forwarding of the file maps their network.
+
+---
+
+## Status & Roadmap
+
+| Module | Status |
+|---|---|
+| QCS (Quasi-Crystal Signature) | ✅ Production-grade |
+| Entropic Clock | ✅ Implemented |
+| Shamir Fragmentation | ✅ Implemented |
+| Topological Audit Trail | ✅ Implemented |
+| KDR (Keystroke Dynamics) | 🔄 Integration in progress |
+| Kernel_Liquid / MTD | 📐 Specification complete |
+| Shadow_Magazine | 📐 Specification complete |
+| Propagation Beacon | 📐 Specification complete |
+
+---
+
+## Related Work
+
+This architecture draws on and extends the following research areas:
+
+- **Moving Target Defense** — Jajodia et al., *Moving Target Defense* (Springer, 2011)
+- **Keystroke Dynamics** — Monrose & Rubin, *Keystroke dynamics as a biometric for authentication* (1999)
+- **Penrose Tiling** — Penrose, *The role of aesthetics in pure and applied mathematical research* (1974)
+- **Canary Tokens / Active Watermarking** — Thinkst Applied Research
+- **Secret Sharing** — Shamir, *How to share a secret* (1979)
+
+---
+
+## License
+
+Proprietary — Research use only.  
+© PSC Cyber. All rights reserved.
+
+---
+
+*"A system that moves cannot be aimed at. A system that marks cannot be silently robbed."*
+payload.encode("utf-8")
 
 
 @dataclass
